@@ -13,3 +13,14 @@ export const requireAuth = (req, res, next) => {
     console.log("Token hợp lệ, cho phép đi tiếp.");
     next();    
 }
+export const requireAdminRole = (req, res, next) => {
+    const role = req.headers['x-role'];
+
+    if (role !== 'admin') {
+        const error = new Error('Truy cập bị từ chối: Yêu cầu quyền admin!');
+        error.statusCode = 403;
+        return next(error);
+    }
+
+    next();
+};

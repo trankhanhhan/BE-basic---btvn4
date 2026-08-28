@@ -1,37 +1,25 @@
-let MOCK_PRODUCTS = [
-  { id: 1, name: 'MacBook Pro M3', price: 2000, category: 'electronics', inStock: true },
-  { id: 2, name: 'iPhone 15 Pro', price: 1200, category: 'electronics', inStock: true },
-  { id: 3, name: 'Tai nghe Sony XM5', price: 350, category: 'accessories', inStock: false },
-  { id: 4, name: 'Bàn phím Keychron K2', price: 100, category: 'accessories', inStock: true },
+let products = [
+  { id: 1, name: "iPhone 16 Pro Max", price: 1199, category: "pro", inStock: true },
+  { id: 2, name: "iPhone 16", price: 799, category: "standard", inStock: true },
+  { id: 3, name: "iPhone 15 Pro", price: 899, category: "pro", inStock: false },
 ];
 
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-export const findProductsFromDB = async () => {
-  await delay(200);
-  return [...MOCK_PRODUCTS];
+export const getAllProductsFromDB = async () => {
+  return products;
 };
 
-export const findProductByIdFromDB = async (id) => {
-  await delay(100);
-  return MOCK_PRODUCTS.find((p) => p.id === id) ?? null;
+export const getProductByIdFromDB = async (id) => {
+  return products.find((p) => p.id === id);
 };
 
-export const findProductByNameFromDB = async (name) => {
-  await delay(100);
-  return MOCK_PRODUCTS.find((p) => p.name.toLowerCase() === name.toLowerCase()) ?? null;
-};
-
-export const createProductInDB = async ({ name, price, category = 'general', inStock = true }) => {
-  await delay(200);
+export const createProductInDB = async ({ name, price, category, inStock }) => {
   const newProduct = {
-    id: MOCK_PRODUCTS.length + 1,
+    id: products.length > 0 ? Math.max(...products.map((p) => p.id)) + 1 : 1,
     name,
     price: Number(price),
     category,
-    inStock: Boolean(inStock),
-    created_at: new Date().toISOString(),
+    inStock,
   };
-  MOCK_PRODUCTS.push(newProduct);
-  return { ...newProduct };
+  products.push(newProduct);
+  return newProduct;
 };
