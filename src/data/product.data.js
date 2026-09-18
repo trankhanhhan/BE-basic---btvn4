@@ -4,4 +4,4 @@ let products = [
   { id: 3, name: "iPhone 15 Pro", price: 899, category: "pro", inStock: false },
 ];
 
-module.exports = products;s
+module.exports = products;

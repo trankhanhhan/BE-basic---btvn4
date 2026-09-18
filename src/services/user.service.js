@@ -1,76 +1,110 @@
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import {
-  getAllUsersFromDB,
-  getUserByIdFromDB,
   getUserByEmailFromDB,
   createUserInDB,
+  updateRefreshToken,
+  findByRefreshToken,
+  getAllUsersFromDB
 } from '../repositories/mock.data.js';
 
-import { filterActiveUsers, formatUsers, formatUser } from '../utils/user.utils.js';
+const ACCESS_SECRET = process.env.ACCESS_TOKEN_SECRET || 'access_secret_key';
+const REFRESH_SECRET = process.env.REFRESH_TOKEN_SECRET || 'refresh_secret_key';
 
-export const getUsers = async ({ active } = {}) => {
-  let users = await getAllUsersFromDB();
-
-  if (active !== undefined) {
-    const isActive = active === 'true' || active === true;
-    users = isActive ? filterActiveUsers(users) : users.filter((u) => !u.is_active);
-  }
-
-  return formatUsers(users);
+const generateTokens = (payload) => {
+  const accessToken = jwt.sign(payload, ACCESS_SECRET, { expiresIn: '15m' });
+  const refreshToken = jwt.sign(payload, REFRESH_SECRET, { expiresIn: '7d' });
+  return { accessToken, refreshToken };
 };
 
-export const getUserById = async (id) => {
-  const numericId = parseInt(id);
-  if (isNaN(numericId)) {
-    const error = new Error('ID người dùng không hợp lệ!');
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const user = await getUserByIdFromDB(numericId);
-  if (!user) {
-    const error = new Error(`Không tìm thấy người dùng với ID: ${id}`);
-    error.statusCode = 404;
-    throw error;
-  }
-
-  return formatUser(user);
-};
-
-export const createUser = async ({ fullName, email, role = 'user', password }) => {
-  // 1. Validation nghiệp vụ
-  if (!fullName || fullName.trim().length < 2) {
-    const error = new Error('Họ và tên phải có ít nhất 2 ký tự!');
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (!email || !email.includes('@')) {
-    const error = new Error('Email không hợp lệ!');
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (!password || password.length < 6) {
-    const error = new Error('Mật khẩu phải có tối thiểu 6 ký tự!');
-    error.statusCode = 400;
-    throw error;
-  }
-
-  // 2. Kiểm tra email trùng lặp
+export const register = async ({ fullName, email, password, role = 'user' }) => {
   const existingUser = await getUserByEmailFromDB(email);
   if (existingUser) {
-    const error = new Error('Email này đã được sử dụng trong hệ thống!');
-    error.statusCode = 409; // 409 Conflict
+    const error = new Error('Email đã được sử dụng');
+    error.status = 409;
     throw error;
   }
 
-  // 3. Tạo user và lưu vào DB
-  const createdUser = await createUserInDB({
-    fullName: fullName.trim(),
-    email: email.trim().toLowerCase(),
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const newUser = await createUserInDB({
+    fullName,
+    email,
     role,
-    password,
+    password_hash: hashedPassword
   });
 
-  return formatUser(createdUser);
+  const tokens = generateTokens({ id: newUser.id, role: newUser.role });
+  await updateRefreshToken(newUser.id, tokens.refreshToken);
+
+  return {
+    user: { id: newUser.id, full_name: newUser.full_name, email: newUser.email, role: newUser.role },
+    ...tokens
+  };
+};
+
+export const login = async ({ email, password }) => {
+  const user = await getUserByEmailFromDB(email);
+  if (!user) {
+    const error = new Error('Email hoặc mật khẩu không chính xác');
+    error.status = 401;
+    throw error;
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password_hash);
+  if (!isMatch) {
+    const error = new Error('Email hoặc mật khẩu không chính xác');
+    error.status = 401;
+    throw error;
+  }
+
+  const tokens = generateTokens({ id: user.id, role: user.role });
+  await updateRefreshToken(user.id, tokens.refreshToken);
+
+  return {
+    user: { id: user.id, full_name: user.full_name, email: user.email, role: user.role },
+    ...tokens
+  };
+};
+
+export const logout = async (userId) => {
+  // Xóa Refresh Token để thu hồi quyền
+  await updateRefreshToken(userId, null);
+};
+
+export const refreshToken = async (token) => {
+  if (!token) {
+    const error = new Error('Thiếu Refresh Token');
+    error.status = 401;
+    throw error;
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, REFRESH_SECRET);
+  } catch (err) {
+    const error = new Error('Refresh Token không hợp lệ hoặc đã hết hạn');
+    error.status = 403;
+    throw error;
+  }
+
+  const user = await findByRefreshToken(token);
+  if (!user || user.id !== decoded.id) {
+    const error = new Error('Refresh Token đã bị thu hồi hoặc không hợp lệ');
+    error.status = 403;
+    throw error;
+  }
+
+  const accessToken = jwt.sign(
+    { id: user.id, role: user.role },
+    ACCESS_SECRET,
+    { expiresIn: '15m' }
+  );
+
+  return { accessToken };
+};
+
+export const getUsers = async () => {
+  const users = await getAllUsersFromDB();
+  return users.map(({ password_hash, refresh_token, ...safeUser }) => safeUser);
 };

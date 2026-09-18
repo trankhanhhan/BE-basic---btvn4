@@ -21,17 +21,31 @@ export const getUserByEmailFromDB = async (email) => {
   return MOCK_USERS.find((u) => u.email === email) ?? null;
 };
 
-export const createUserInDB = async ({ fullName, email, role = 'user', password }) => {
+export const createUserInDB = async ({ fullName, email, role = 'user', password_hash }) => {
   await delay(200);
   const newUser = {
-    id: MOCK_USERS.length + 1,
+    id: MOCK_USERS.length > 0 ? Math.max(...MOCK_USERS.map((u) => u.id)) + 1 : 1,
     full_name: fullName,
     email,
     role,
     is_active: true,
-    password_hash: `$2b$10$mockhashed_${password}`,
+    password_hash,
+    refresh_token: null,
     created_at: new Date().toISOString(),
   };
   MOCK_USERS.push(newUser);
   return { ...newUser };
+};
+
+export const updateRefreshToken = async (userId, refreshToken) => {
+  await delay(100);
+  const user = MOCK_USERS.find((u) => u.id === Number(userId));
+  if (user) {
+    user.refresh_token = refreshToken;
+  }
+};
+
+export const findByRefreshToken = async (refreshToken) => {
+  await delay(100);
+  return MOCK_USERS.find((u) => u.refresh_token === refreshToken) ?? null;
 };

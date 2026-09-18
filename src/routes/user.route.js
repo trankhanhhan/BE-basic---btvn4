@@ -1,11 +1,13 @@
-import express from 'express';
+import { Router } from 'express';
 import * as userController from '../controllers/user.controller.js';
-import { requireAuth } from '../middlewares/auth.middleware.js';
+import { authMiddleware } from '../middlewares/auth.middleware.js';
 
-const router = express.Router();
+const router = Router();
 
-router.get('/', requireAuth, userController.getUsers);
-router.get('/:id', userController.getUserById);
-router.post('/', userController.createUser);
+router.post('/register', userController.register);
+router.post('/login', userController.login);
+router.post('/refresh', userController.refresh);
+router.post('/logout', authMiddleware, userController.logout);
+router.get('/users', authMiddleware, userController.getUsers);
 
 export default router;
